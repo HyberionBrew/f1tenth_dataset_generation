@@ -1,0 +1,7 @@
+setup.py
+ftg_agents/__init__.py
+ftg_agents/agents.py
+ftg_agents.egg-info/PKG-INFO
+ftg_agents.egg-info/SOURCES.txt
+ftg_agents.egg-info/dependency_links.txt
+ftg_agents.egg-info/top_level.txt
