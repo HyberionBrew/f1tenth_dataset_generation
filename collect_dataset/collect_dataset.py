@@ -6,7 +6,7 @@ from argparse import Namespace
 from f110_gym.envs.base_classes import Integrator
 import yaml
 import numpy as np
-from numba import njit
+# from numba import njit
 
 from ftg_agents.agents import *
 import pickle as pkl
@@ -23,7 +23,9 @@ flags.DEFINE_bool('record', False, 'Whether to record the run')
 flags.DEFINE_bool('render', True, 'Whether to render the run')
 flags.DEFINE_float('speed', 1.0, 'Mean speed of the car')
 
-agents = {'StochasticFTGAgent': StochasticFTGAgent,
+agents = {
+    'DeterministicFTGAgent': DeterministicFTGAgent,
+    'StochasticFTGAgent': StochasticFTGAgent,
 'StochasticFTGAgentRandomSpeed': StochasticFTGAgentRandomSpeed, 
 'StochasticFTGAgentDynamicSpeed': StochasticFTGAgentDynamicSpeed} #, 'FTGAgent': FTGAgent, 'PurePursuitAgent': PurePursuitAgent}
 
