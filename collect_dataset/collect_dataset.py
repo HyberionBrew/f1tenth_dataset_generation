@@ -52,12 +52,13 @@ def main(argv):
             if timestep % 5 == 0: # corresponds to an action rate of 20Hz
                 speed, steering = agent.get_action(obs["scans"][0])
                 steering = float(steering)
+                speed = float(speed)
             obs, step_reward, done, info = env.step(np.array([[steering, speed]]))
             
 
-            if timestep % 5 == 0 and FLAGS.record:
+            if (timestep % 5 == 0 or done) and FLAGS.record:
                 with open(FLAGS.dataset_name, 'ab') as f:
-                    pkl.dump((speed, steering, obs, step_reward, done, info, timestep, FLAGS.dataset_name), f)
+                    pkl.dump((speed, steering, obs, step_reward, done, info, timestep, (FLAGS.agent,FLAGS.speed)), f)
             if timestep % 100 == 0:
                 print(timestep)
             timestep += 1
