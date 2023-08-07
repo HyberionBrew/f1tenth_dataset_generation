@@ -70,6 +70,43 @@ class StochasticFTGAgent(BaseAgent):
         action = self.lidar_ray_to_steering(action, self.sub_sample)
         return self.get_speed(obs), action
     
+
+class DeterministicFTGAgent(BaseAgent):
+    def __init__(self, env, sub_sample=10, speed=1.0, cutoff=10):
+        super(DeterministicFTGAgent, self).__init__(env)
+        self.sub_sample = sub_sample
+        self.speed = speed
+        self.cutoff = cutoff
+
+    def get_speed(self, obs):
+        # sample from a normal distribution with mean speed and std cutoff
+        return self.speed
+
+    def get_action(self, obs):
+        obs = obs[::self.sub_sample]
+        # add a zero at start and end
+        obs = tf.concat([[0.], obs, [0.]], 0)
+        # smooth the observations
+        # import matplotlib.pyplot as plt
+        window_size = 25
+        obs = tf.expand_dims(tf.expand_dims(obs, 0), -1)  # add two dimensions for max_pool1d
+        smoothed_obs_neg = tf.nn.max_pool1d(-obs, window_size, 1, 'SAME')
+        smoothed_obs = -tf.squeeze(smoothed_obs_neg, [0, -1])  # remove the extra dimensions and negate
+        obs = smoothed_obs
+        # remove zero at start and end
+        obs = obs[1:-1]
+        # set to zero where not close enough to the max
+        # obs = tf.where(obs < 0.9 * tf.reduce_max(obs), tf.zeros_like(obs), obs)
+        # set to zero where more than x indices away from the max
+        # obs = tf.where(tf.abs(tf.argmax(obs) - tf.range(0, 1080, self.sub_sample)) > 10, tf.zeros_like(obs), obs)
+        # Create a range tensor from [0, ..., length-1]
+        argmax_obs = tf.cast(tf.argmax(obs), tf.int32)
+        action = argmax_obs.numpy()
+        print(action)
+        action = self.lidar_ray_to_steering(action, self.sub_sample)
+        return self.get_speed(obs), action
+    
+
 class StochasticFTGAgentRandomSpeed(StochasticFTGAgent):
     # inherit from the StochasticFTGAgent
     def __init__(self, env, sub_sample=10, speed=3.0, cutoff=10):

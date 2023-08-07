@@ -15,7 +15,7 @@ from absl import flags, app
 FLAGS = flags.FLAGS
 
 flags.DEFINE_integer('timesteps',10000, 'Number of timesteps to run for')
-flags.DEFINE_integer('sub_sample',10, 'Number of timesteps to run for')
+flags.DEFINE_integer('sub_sample',10, 'Number of lidar rays to subsample')
 flags.DEFINE_string('agent', 'StochasticFTGAgent', 'Name of agent to use')
 flags.DEFINE_string('map_config', 'config.yaml' , 'Name of map config file')
 flags.DEFINE_string('dataset_name', 'dataset.pkl', 'Name of dataset file')
