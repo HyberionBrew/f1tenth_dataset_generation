@@ -11,6 +11,7 @@ import numpy as np
 from ftg_agents.agents import *
 import pickle as pkl
 from absl import flags, app
+from tqdm import tqdm
 
 FLAGS = flags.FLAGS
 
@@ -45,12 +46,14 @@ def main(argv):
     
     
     timestep = 0
-    
+    pbar = tqdm(total=FLAGS.timesteps, desc="Processing", position=0, leave=True)
+
     while timestep < FLAGS.timesteps:
+    #for timestep in range(FLAGS.timesteps):
         obs, step_reward, done, info = env.reset(np.array([[conf.sx, conf.sy, conf.stheta]]))
         if FLAGS.render:
             env.render()   
-        while not done:
+        while not done and timestep < FLAGS.timesteps:
             if timestep % 5 == 0: # corresponds to an action rate of 20Hz
                 speed, steering = agent.get_action(obs["scans"][0])
                 steering = float(steering)
@@ -59,11 +62,13 @@ def main(argv):
             
 
             if (timestep % 5 == 0 or done) and FLAGS.record:
-                with open(FLAGS.dataset_name, 'ab') as f:
+                with open("raw_datasets/"+FLAGS.dataset_name, 'ab') as f:
                     pkl.dump((speed, steering, obs, step_reward, done, info, timestep, (FLAGS.agent,FLAGS.speed)), f)
-            if timestep % 100 == 0:
-                print(timestep)
+            #if timestep % 300 == 0:
+            #    print(timestep)
             timestep += 1
+            # Update the progress bar by 1
+            pbar.update(1)
             if FLAGS.render:
                 env.render()
         

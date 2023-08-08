@@ -10,6 +10,17 @@ class BaseAgent(object):
         self.observation_space = env.observation_space
         # there are 1080 rays over 270 degrees, calculate the angle increment
         self.angle_increment = 270. / 1080. * pi / 180.
+    
+    def __call__(self, obs, std=None, actions=None): 
+        # Std is actually just ignored       
+        if actions is None:
+            speed, action = self.get_action(obs)
+            return None, action, None
+        
+        else:
+            log_prob = self.get_log_probs(obs, actions)
+            return None, None, log_prob
+        
     def get_action(self, obs):
         raise NotImplementedError
 
@@ -29,14 +40,13 @@ class StochasticFTGAgent(BaseAgent):
         self.sub_sample = sub_sample
         self.speed = speed
         self.cutoff = cutoff
+
     def get_speed(self, obs):
         # sample from a normal distribution with mean speed and std cutoff
         speed = tf.random.normal([1], mean=self.speed, stddev=0.2)
         return speed[0]
-
-    def get_action(self, obs):
-        # obs is an array [1080] of lidar readings
-        # first subsample the lidar array with sub_sample
+    
+    def get_probs(self,obs):
         obs = obs[::self.sub_sample]
         # add a zero at start and end
         obs = tf.concat([[0.], obs, [0.]], 0)
@@ -63,14 +73,29 @@ class StochasticFTGAgent(BaseAgent):
         total_length = tf.reduce_sum(obs)
         # print(probabilities)
         probabilities = probabilities / total_length
+        return probabilities
+    
+    def get_action(self, obs):
+        # obs is an array [1080] of lidar readings
+        # first subsample the lidar array with sub_sample
+        probabilities = self.get_probs(obs)
         # create a categorical distribution based on the probabilities
         # TODO! make this continous
         dist = tf.random.categorical(tf.math.log([probabilities]), 1)
         action = dist[0][0].numpy()
         action = self.lidar_ray_to_steering(action, self.sub_sample)
+
         return self.get_speed(obs), action
     
+    def get_log_probs(self, obs, action):
+        probabilities = self.get_probs(obs)
+        # Compute log probabilities
+        log_probs = tf.nn.log_softmax(probabilities)
 
+        # Get log probability of chosen action
+        log_prob_action = log_probs[action].numpy()
+        return log_prob_action
+    
 class DeterministicFTGAgent(BaseAgent):
     def __init__(self, env, sub_sample=10, speed=1.0, cutoff=10):
         super(DeterministicFTGAgent, self).__init__(env)
@@ -104,7 +129,7 @@ class DeterministicFTGAgent(BaseAgent):
         action = argmax_obs.numpy()
         print(action)
         action = self.lidar_ray_to_steering(action, self.sub_sample)
-        return self.get_speed(obs), action
+        return self.get_speed(obs), action , 1.0
     
 
 class StochasticFTGAgentRandomSpeed(StochasticFTGAgent):

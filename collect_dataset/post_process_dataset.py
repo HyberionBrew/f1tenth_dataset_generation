@@ -20,9 +20,9 @@ flags.DEFINE_string('input_folder', 'raw_datasets', 'Name of dataset file')
 flags.DEFINE_string('output_file', 'SFTG_speed_1.0_processed.pkl', 'Name of dataset file')
 flags.DEFINE_string('centerline_file', 'ellipse_map2.csv', 'Name of centerline file')
 flags.DEFINE_bool('plot', True, 'Plot the dataset')
-flags.DEFINE_integer('max_traj_length', 400, 'Maximum length of a trajectory')
+flags.DEFINE_integer('max_traj_length', 1000, 'Maximum length of a trajectory')
 flags.DEFINE_integer('min_traj_length', 3, 'Minimum length of a trajectory')
-
+flags.DEFINE_bool('save_figs', True, 'Save the figures')
 
 def lap_length(centerpoints):
     centerpoints = np.array(centerpoints)
@@ -120,7 +120,6 @@ class PickleDataset(object):
             # else append new progress
             else:
                 for p in new_progress:
-
                     progress.append(p)
                     #print(p)
 
@@ -136,6 +135,8 @@ class PickleDataset(object):
         for trajectory in progress:
             # if the trajectory reaches 1.0
             remaining_trajectory = trajectory
+            if len(remaining_trajectory) == 0:
+                continue
 
             while np.max(remaining_trajectory) >= 1.0:
                 #print(len(remaining_trajectory))
@@ -146,12 +147,18 @@ class PickleDataset(object):
                 new_trajectory = remaining_trajectory[:one_indices+1]
                 remaining_trajectory = remaining_trajectory[one_indices+1:]
                 # subtract the first value from the remaining trajectory
-                remaining_trajectory -= remaining_trajectory[0]
+                if len(remaining_trajectory) > 0:
+                    remaining_trajectory -= remaining_trajectory[0] #TODO! bug here due to index oob
                 
                 #print(len(remaining_trajectory))
                 # append the first X (hopefully less) elements of the new trajectory
                 all_progress.append(new_trajectory) # [:FLAGS.max_traj_length])
-            all_progress.append(remaining_trajectory)
+                if len(remaining_trajectory) == 0:
+                    break 
+
+
+            if len(remaining_trajectory) > 0:
+                all_progress.append(remaining_trajectory)
         # plot 
         #plt.title('Split Trajectories')
         #for prog in all_progress:
@@ -256,27 +263,42 @@ def main(argv):
     plt.scatter(x_c, y_c, s=0.2, label='trajectories')
     if FLAGS.plot:
         plt.show()
-    
-    # check all pickle files available
-    all_files = [f for f in os.listdir( FLAGS.input_folder) if os.path.isfile(os.path.join( FLAGS.input_folder, f))]
-    print(f"Available files: {all_files}")
+    if FLAGS.save_figs:
+        plt.savefig(f"plots/middle_line.png")
+        plt.clf()
 
+    # check all pickle files available
+    all_files = [os.path.join(FLAGS.input_folder, f) for f in os.listdir( FLAGS.input_folder)] # if os.path.isfile()]
+    # all_files = ["raw_datasets/StochasticFTGAgent_4.0.pkl"]
     # loop over all the files
     lap_len = lap_length(centerline_points)
     all_trajectories = []
     for file in all_files:
+        print("Processing file: ", file)
+        # print current directory
+        print(os.getcwd())
         rawDataset = PickleDataset(file)
         x_pose, y_pose = rawDataset.get_pose()
         plt.scatter(x_c, y_c, s=0.2, label='centerline')
         plt.scatter(x_pose, y_pose, s=0.2, label='trajectories')
         if FLAGS.plot:
             plt.show()
+        
+        if FLAGS.save_figs:
+            file = file.split('/')[-1]
+            plt.savefig(f"plots/centerline_and_trajectories{file}.png")
+            plt.clf()
+
         progress = rawDataset.get_progress(centerpoints=centerline_points)
         progress = progress/ lap_len
         plt.title('Progress')
         plt.plot(progress)
+
         if FLAGS.plot:
             plt.show()
+        if FLAGS.save_figs:
+            plt.savefig(f"plots/progress{file}.png")
+            plt.clf()
         
         trajectories = rawDataset.split_trajectories(progress)
         # print(len(trajectories))
@@ -293,6 +315,9 @@ def main(argv):
             plt.plot(getProgress([trajectory]))
         if FLAGS.plot:
             plt.show()
+        if FLAGS.save_figs:
+            plt.savefig(f"plots/split_trajectories_{file}.png")
+            plt.clf()
         
         # calculate the reward
         trajectories = calculateRewardTD(trajectories)
@@ -302,6 +327,9 @@ def main(argv):
             plt.plot(getField([trajectory], 'rewardTD'))
         if FLAGS.plot:
             plt.show()
+        if FLAGS.save_figs:
+            plt.savefig(f"plots/reward_{file}.png")
+            plt.clf()
 
         # plot continous reward
         plt.title('Continous Reward')
@@ -309,13 +337,16 @@ def main(argv):
         plt.plot(getField(trajectories, 'progress') * 0.005)
         if FLAGS.plot:
             plt.show()
+        if FLAGS.save_figs:
+            plt.savefig(f"plots/reward_cont_{file}.png")
+            plt.clf()
 
 
         all_trajectories += trajectories
     # now save trajectories into zarr files
     root = zarr.open('trajectories.zarr', mode='w')
     print(" Length of all trajectories: ", len(all_trajectories))
-    for i, trajectory in tqdm(enumerate(all_trajectories)):
+    for i, trajectory in tqdm(enumerate(all_trajectories), total=len(all_trajectories), desc="Processing trajectories"):
         trajectory_group = root.create_group(str(i))
 
         trajectory_group.array('rewards', data=getField([trajectory],'rewardTD'), chunks=(500,))
